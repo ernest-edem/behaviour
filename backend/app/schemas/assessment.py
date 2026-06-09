@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
 
 
@@ -16,8 +16,8 @@ class AssessmentCreate(BaseModel):
     sleep_hours: float = Field(..., ge=0, le=24)
     stress_level: int = Field(..., ge=1, le=10)
     physical_activity: int = Field(..., ge=1, le=10)
-    smoking: int = Field(..., ge=0, le=1)  # 0 or 1
-    alcohol: int = Field(..., ge=0, le=1)   # 0 or 1
+    smoking: int = Field(..., ge=0, le=1)
+    alcohol: int = Field(..., ge=0, le=1)
     blood_pressure: float = Field(..., gt=50, lt=250)
     glucose_level: float = Field(..., gt=50, lt=500)
 
@@ -27,3 +27,5 @@ class AssessmentResult(BaseModel):
     risk_level: RiskLevel
     confidence: float
     explanation: str
+    
+    model_config = ConfigDict(from_attributes=True)
