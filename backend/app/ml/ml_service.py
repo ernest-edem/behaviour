@@ -4,7 +4,7 @@ import logging
 from typing import Dict, Any
 from app.ml.preprocess import preprocessor
 from app.ml.explainer import explainer
-from app.schemas.assessment import RiskLevel
+from app.schemas.prediction import RiskLevel
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)

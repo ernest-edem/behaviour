@@ -10,7 +10,7 @@ from app.schemas.auth import TokenPayload
 from app.core.exceptions import AuthError, ForbiddenError
 
 reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login"
+    tokenUrl="/api/v1/auth/token"
 )
 
 

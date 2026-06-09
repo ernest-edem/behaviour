@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health, auth, assessment, admin
+from app.api.routes import health, auth, assessment, prediction, disease_predictions, admin
 from app.core.config import settings
 from app.core.exceptions import AppError
 
@@ -69,7 +69,21 @@ async def log_requests(request: Request, call_next):
 # Register Routers
 app.include_router(health.router, prefix=f"{settings.API_V1_STR}/health", tags=["health"])
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
-app.include_router(assessment.router, prefix=f"{settings.API_V1_STR}/assessment", tags=["assessment"])
+app.include_router(
+    assessment.router,
+    prefix=f"{settings.API_V1_STR}/assessments",
+    tags=["Assessments"],
+)
+app.include_router(
+    prediction.router,
+    prefix=f"{settings.API_V1_STR}/assessment",
+    tags=["assessment"],
+)
+app.include_router(
+    disease_predictions.router,
+    prefix=f"{settings.API_V1_STR}/predictions",
+    tags=["Predictions"],
+)
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 
 
