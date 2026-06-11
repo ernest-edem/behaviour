@@ -1,71 +1,90 @@
-from typing import Dict
+from typing import Any
+import logging
 
 from sqlalchemy.orm import Session
 
-from app.models.user import User, UserRole
-from app.schemas.auth import UserCreate, UserLogin
+from app.core.exceptions import AuthError
 from app.core.security import (
+    create_access_token,
     get_password_hash,
     verify_password,
-    create_access_token,
 )
-from app.core.exceptions import AuthError
+from app.models.user import User, UserRole
+from app.schemas.auth import UserCreate, UserLogin
+
+logger = logging.getLogger(__name__)
 
 
-# =========================================================
-# AUTH SERVICE
-# =========================================================
 class AuthService:
     """
     Authentication and user management service.
+
+    Responsibilities:
+    - User registration
+    - User authentication
+    - JWT generation
+
+    Bootstrap policy:
+    - First registered user becomes ADMIN.
+    - All subsequent users become USER.
     """
 
     # =====================================================
     # CREATE USER
     # =====================================================
     @staticmethod
-    def create_user(db: Session, user_in: UserCreate) -> User:
+    def create_user(
+        db: Session,
+        user_in: UserCreate,
+    ) -> User:
         """
-        Create a new user.
+        Create a new user account.
 
         Bootstrap behavior:
-        - First registered user becomes ADMIN.
-        - All subsequent users become USER.
+            - First user -> ADMIN
+            - Subsequent users -> USER
         """
+
+        normalized_email = user_in.email.lower().strip()
 
         existing_user = (
             db.query(User)
-            .filter(User.email == user_in.email)
+            .filter(User.email == normalized_email)
             .first()
         )
 
         if existing_user:
-            raise AuthError(message="User with this email already exists")
+            raise AuthError(
+                message="User with this email already exists"
+            )
 
-        # -------------------------------------------------
-        # Bootstrap first admin
-        # -------------------------------------------------
         admin_exists = (
             db.query(User)
             .filter(User.role == UserRole.ADMIN)
             .first()
         )
 
-        role = UserRole.ADMIN if not admin_exists else UserRole.USER
+        assigned_role = (
+            UserRole.ADMIN
+            if admin_exists is None
+            else UserRole.USER
+        )
 
-        new_user = User(
-            email=user_in.email,
-            name=user_in.email.split("@")[0],
-            hashed_password=get_password_hash(user_in.password),
-            role=role,
+        user = User(
+            email=normalized_email,
+            name=normalized_email.split("@")[0],
+            hashed_password=get_password_hash(
+                user_in.password
+            ),
+            role=assigned_role,
             is_active=True,
         )
 
-        db.add(new_user)
+        db.add(user)
         db.commit()
-        db.refresh(new_user)
+        db.refresh(user)
 
-        return new_user
+        return user
 
     # =====================================================
     # AUTHENTICATE USER
@@ -76,55 +95,91 @@ class AuthService:
         user_in: UserLogin,
     ) -> User:
         """
-        Authenticate user by email and password.
+        Authenticate a user using email and password.
         """
 
-        # ---------------- DEBUG ----------------
-        print("\n========== AUTH DEBUG ==========")
-        print("User class:", User)
-        print("Module:", User.__module__)
-        print("Role enums:", User.role.type.enums)
-        print("Column enums:", User.__table__.c.role.type.enums)
-        print("USER VALUE:", UserRole.USER.value)
-        print("ADMIN VALUE:", UserRole.ADMIN.value)
-        print("================================\n")
-        # ---------------------------------------
+        normalized_email = user_in.email.lower().strip()
+
+        logger.info(
+            "Login attempt for email=%s",
+            normalized_email,
+        )
 
         user = (
             db.query(User)
-            .filter(User.email == user_in.email)
+            .filter(User.email == normalized_email)
             .first()
         )
 
-        if user is None:
-            raise AuthError(message="Incorrect email or password")
+        logger.info(
+            "User found: %s",
+            user is not None,
+        )
 
-        if not verify_password(
+        if user is None:
+            raise AuthError(
+                message="Incorrect email or password"
+            )
+
+        password_match = verify_password(
             user_in.password,
             user.hashed_password,
-        ):
-            raise AuthError(message="Incorrect email or password")
+        )
+
+        logger.info(
+            "Password match: %s",
+            password_match,
+        )
+
+        if not password_match:
+            raise AuthError(
+                message="Incorrect email or password"
+            )
 
         if not user.is_active:
-            raise AuthError(message="Inactive user")
+            raise AuthError(
+                message="Inactive user"
+            )
+
+        logger.info(
+            "Login successful for user_id=%s",
+            user.id,
+        )
 
         return user
 
     # =====================================================
-    # CREATE JWT TOKEN
+    # TOKEN PAYLOAD
     # =====================================================
     @staticmethod
-    def create_token_for_user(user: User) -> Dict[str, str]:
+    def _build_token_payload(
+        user: User,
+    ) -> dict[str, Any]:
+        """
+        Build JWT custom claims.
+        """
+
+        return {
+            "role": user.role.value,
+            "email": user.email,
+        }
+
+    # =====================================================
+    # CREATE ACCESS TOKEN
+    # =====================================================
+    @staticmethod
+    def create_token_for_user(
+        user: User,
+    ) -> dict[str, str]:
         """
         Create JWT access token.
         """
 
         access_token = create_access_token(
             subject=str(user.id),
-            additional_claims={
-                "role": user.role.value,
-                "email": user.email,
-            },
+            additional_claims=AuthService._build_token_payload(
+                user
+            ),
         )
 
         return {
@@ -135,6 +190,7 @@ class AuthService:
 
 
 # =========================================================
-# SINGLETON
+# SINGLETON INSTANCE
 # =========================================================
+
 auth_service = AuthService()

@@ -1,34 +1,58 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
-from app.db.session import get_db
-from app.models.user import User, UserRole
-from app.schemas.explanation import PredictionExplanationResponse
-from app.services.explanation_service import explanation_service
+from app.api.deps import get_db
+from app.core.rbac import Role, require_roles
 
-router = APIRouter()
+from app.models.user import User
+
+from app.schemas.explanation import (
+    PredictionExplanationResponse,
+)
+
+from app.services.explanation_service import (
+    explanation_service,
+)
+
+router = APIRouter(
+    prefix="/explanations",
+    tags=["Explanations"],
+)
 
 
-# =========================================================
-# GENERATE EXPLANATIONS (PROTECTED)
-# =========================================================
-
+# ==========================================================
+# GENERATE EXPLANATION
+# ==========================================================
 @router.post(
     "/{prediction_id}",
     response_model=PredictionExplanationResponse,
     status_code=status.HTTP_201_CREATED,
 )
-def generate_explanations(
+def generate_explanation(
     prediction_id: int,
     db: Session = Depends(get_db),
-
-    # 🔐 Only users can generate their own explanations
-    current_user: User = Depends(require_roles([UserRole.USER])),
+    current_user: User = Depends(
+        require_roles(
+            Role.USER,
+            Role.CLINICIAN,
+            Role.ADMIN,
+        )
+    ),
 ):
     """
-    Generate explanation for a prediction.
-    Strictly user-owned operation.
+    Generate explanations.
+
+    USER
+        Own predictions only.
+
+    CLINICIAN
+        Patient predictions.
+
+    ADMIN
+        Global access.
+
+    Ownership and visibility rules are enforced
+    inside ExplanationService.
     """
 
     return explanation_service.generate_explanations_for_user(
@@ -38,30 +62,38 @@ def generate_explanations(
     )
 
 
-# =========================================================
-# GET EXPLANATIONS (USER + CLINICIAN + ADMIN)
-# =========================================================
-
+# ==========================================================
+# GET EXPLANATION
+# ==========================================================
 @router.get(
     "/{prediction_id}",
     response_model=PredictionExplanationResponse,
 )
-def get_explanations(
+def get_explanation(
     prediction_id: int,
     db: Session = Depends(get_db),
-
-    # 🔐 Allow all authenticated roles
     current_user: User = Depends(
         require_roles(
-            [UserRole.USER, UserRole.CLINICIAN, UserRole.ADMIN]
+            Role.USER,
+            Role.CLINICIAN,
+            Role.ADMIN,
         )
     ),
 ):
     """
-    Retrieve explanations with role-based visibility:
-    - USER: only own predictions
-    - CLINICIAN: patient access
-    - ADMIN: full access
+    Retrieve explanations.
+
+    USER
+        Own predictions only.
+
+    CLINICIAN
+        Read access to patient predictions.
+
+    ADMIN
+        Full system access.
+
+    Ownership enforcement is performed
+    by ExplanationService.
     """
 
     return explanation_service.get_explanations_for_user(

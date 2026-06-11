@@ -1,19 +1,30 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user, require_roles
 from app.db.session import get_db
-from app.models.user import User, UserRole
-from app.schemas.prediction import AssessmentResult, PredictionInput
-from app.services.prediction_service import prediction_service
 
-router = APIRouter()
+from app.core.rbac import Role, require_roles
+
+from app.models.user import User
+
+from app.schemas.prediction import (
+    PredictionInput,
+    AssessmentResult,
+)
+
+from app.services.prediction_service import (
+    prediction_service,
+)
+
+router = APIRouter(
+    prefix="/predictions",
+    tags=["Predictions"],
+)
 
 
-# =========================================================
-# PREDICTION ENDPOINT (RBAC PROTECTED)
-# =========================================================
-
+# ==========================================================
+# CREATE PREDICTION
+# ==========================================================
 @router.post(
     "/predict",
     response_model=AssessmentResult,
@@ -22,19 +33,30 @@ router = APIRouter()
 def predict(
     data: PredictionInput,
     db: Session = Depends(get_db),
-
-    # 🔐 RBAC: only USER role can create predictions for now
-    current_user: User = Depends(require_roles([UserRole.USER])),
+    current_user: User = Depends(
+        require_roles(
+            Role.USER,
+        )
+    ),
 ):
     """
-    Create disease prediction from assessment input.
-    Restricted to end users.
+    Generate a prediction for the authenticated user.
+
+    USER
+        Can create predictions for themselves.
+
+    CLINICIAN
+        Not allowed.
+
+    ADMIN
+        Not allowed.
+
+    Ownership is automatically assigned to the
+    authenticated user.
     """
 
-    result = prediction_service.process_assessment(
+    return prediction_service.process_assessment(
         db=db,
         assessment_in=data,
         user_id=current_user.id,
     )
-
-    return result

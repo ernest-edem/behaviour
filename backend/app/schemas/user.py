@@ -1,16 +1,23 @@
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
-from pydantic import BaseModel, EmailStr
+from typing import Literal
+
+
+# -----------------------------
+# SAFE ROLE TYPE (API LAYER)
+# -----------------------------
+UserRoleLiteral = Literal["admin", "clinician", "user"]
 
 
 class UserRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
-    email: EmailStr
-    role: str
+    email: str
+    role: UserRoleLiteral
     is_active: bool
     created_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 class AdminStats(BaseModel):

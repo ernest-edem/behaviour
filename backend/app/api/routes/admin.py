@@ -3,21 +3,31 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin
 from app.db.session import get_db
+
 from app.models.user import User
 from app.models.assessment import Assessment
-from app.schemas.user import UserRead, AdminStats
+
+from app.schemas.user import UserRead
+from app.schemas.admin import AdminStats
 
 router = APIRouter()
 
 
+# =========================================================
+# LIST USERS (ADMIN ONLY)
+# =========================================================
 @router.get("/users", response_model=list[UserRead])
 def list_users(
     db: Session = Depends(get_db),
     _: User = Depends(require_admin),
 ):
-    return db.query(User).order_by(User.created_at.desc()).all()
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    return users
 
 
+# =========================================================
+# SYSTEM STATS (ADMIN ONLY)
+# =========================================================
 @router.get("/stats", response_model=AdminStats)
 def get_stats(
     db: Session = Depends(get_db),
