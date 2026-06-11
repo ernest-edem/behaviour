@@ -1,55 +1,125 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './auth/AuthContext';
-import ProtectedRoute from './components/ProtectedRoute';
-import Navbar from './components/Navbar';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
-import Assessment from './pages/Assessment';
-import AdminDashboard from './pages/AdminDashboard';
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 
-const App: React.FC = () => {
+import { AuthProvider } from "./auth/AuthContext";
+import { WorkflowProvider } from "./context/WorkflowContext";
+import { useAuth } from "./auth/AuthContext";
+
+import ProtectedRoute from "./components/ProtectedRoute";
+import DashboardLayout from "./layouts/DashboardLayout";
+
+// pages
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+
+import DashboardHome from "./pages/DashboardHome";
+import ClinicianDashboard from "./pages/clinician/ClinicianDashboard";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+
+import AssessmentsPage from "./pages/AssessmentsPage";
+import PredictionsPage from "./pages/PredictionsPage";
+import ExplanationsPage from "./pages/ExplanationsPage";
+import HistoryPage from "./pages/HistoryPage";
+import HistoryDetailPage from "./pages/HistoryDetailPage";
+
+import Unauthorized from "./pages/Unauthorized";
+import { DEFAULT_ROUTES } from "./utils/rbacRoutes";
+import type { UserRole } from "./utils/rbacRoutes";
+
+/**
+ * ROLE REDIRECT (SAFE)
+ */
+const RoleRedirect = () => {
+  const { role, loading, isAuthenticated } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
+  }
+
+  if (!isAuthenticated || !role) {
+    return <Navigate to="/login" replace />;
+  }
+
   return (
-    <AuthProvider>
-      <Router>
-        <div className="min-h-screen bg-gray-50">
-          <Navbar />
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/assessment"
-              element={
-                <ProtectedRoute>
-                  <Assessment />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute requiredRole="admin">
-                  <AdminDashboard />
-                </ProtectedRoute>
-              }
-            />
-
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+    <Navigate to={DEFAULT_ROUTES[role as UserRole]} replace />
   );
 };
 
-export default App;
+/**
+ * ROUTES
+ */
+function AppRoutes() {
+  return (
+    <Routes>
+
+      {/* PUBLIC */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+
+      {/* ROOT */}
+      <Route path="/" element={<RoleRedirect />} />
+
+      {/* UNAUTHORIZED */}
+      <Route path="/unauthorized" element={<Unauthorized />} />
+
+      {/* =========================
+          USER ROUTES
+      ========================= */}
+      <Route element={<ProtectedRoute allowedRoles={["user"]} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/dashboard" element={<DashboardHome />} />
+          <Route path="/assessments" element={<AssessmentsPage />} />
+          <Route path="/predictions" element={<PredictionsPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/history/:assessmentId" element={<HistoryDetailPage />} />
+        </Route>
+      </Route>
+
+      {/* =========================
+          CLINICIAN ROUTES
+      ========================= */}
+      <Route element={<ProtectedRoute allowedRoles={["clinician"]} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/clinician/dashboard" element={<ClinicianDashboard />} />
+          <Route path="/explanations" element={<ExplanationsPage />} />
+        </Route>
+      </Route>
+
+      {/* =========================
+          ADMIN ROUTES
+      ========================= */}
+      <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        </Route>
+      </Route>
+
+      {/* FALLBACK */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+
+    </Routes>
+  );
+}
+
+/**
+ * ROOT APP
+ */
+export default function App() {
+  return (
+    <Router>
+      <AuthProvider>
+        <WorkflowProvider>
+          <AppRoutes />
+        </WorkflowProvider>
+      </AuthProvider>
+    </Router>
+  );
+}

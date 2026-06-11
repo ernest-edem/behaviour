@@ -8,6 +8,7 @@ from app.db.session import Base
 
 if TYPE_CHECKING:
     from .assessment import Assessment
+    from .prediction_explanation import PredictionExplanation
 
 
 class DiseasePrediction(Base):
@@ -31,3 +32,7 @@ class DiseasePrediction(Base):
     )
 
     assessment: Mapped["Assessment"] = relationship(back_populates="disease_predictions")
+    explanations: Mapped[list["PredictionExplanation"]] = relationship(
+        back_populates="prediction",
+        cascade="all, delete-orphan",
+    )

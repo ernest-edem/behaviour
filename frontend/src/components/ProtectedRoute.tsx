@@ -1,25 +1,31 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth, type UserRole } from '../auth/AuthContext';
+import { Navigate, Outlet } from "react-router-dom";
+import { useAuth } from "../auth/AuthContext";
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requiredRole?: UserRole;
+export type Role = "user" | "clinician" | "admin";
+
+interface Props {
+  allowedRoles: Role[];
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
-  const { isAuthenticated, role } = useAuth();
-  const location = useLocation();
+export default function ProtectedRoute({ allowedRoles }: Props) {
+  const { token, role, loading } = useAuth();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Loading...
+      </div>
+    );
   }
 
-  if (requiredRole && role !== requiredRole) {
-    return <Navigate to="/dashboard" replace />;
+  if (!token || !role) {
+    return <Navigate to="/login" replace />;
   }
 
-  return <>{children}</>;
-};
+  // ❌ STRICT BLOCK (no fallback to another dashboard)
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/unauthorized" replace />;
+  }
 
-export default ProtectedRoute;
+  return <Outlet />;
+}

@@ -5,3 +5,4 @@ from app.models.user import User  # noqa
 from app.models.assessment import Assessment  # noqa
 from app.models.prediction import Prediction  # noqa
 from app.models.disease_prediction import DiseasePrediction  # noqa
+from app.models.prediction_explanation import PredictionExplanation  # noqa

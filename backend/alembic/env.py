@@ -25,6 +25,7 @@ from app.models.user import User
 from app.models.assessment import Assessment
 from app.models.prediction import Prediction
 from app.models.disease_prediction import DiseasePrediction
+from app.models.prediction_explanation import PredictionExplanation
 from app.core.config import settings
 
 # add your model's MetaData object here

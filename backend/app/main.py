@@ -6,7 +6,9 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import health, auth, assessment, prediction, disease_predictions, admin
+from app.api.routes import admin
+
+from app.api.routes import health, auth, assessment, prediction, disease_predictions, explanations, admin
 from app.core.config import settings
 from app.core.exceptions import AppError
 
@@ -84,6 +86,11 @@ app.include_router(
     prefix=f"{settings.API_V1_STR}/predictions",
     tags=["Predictions"],
 )
+app.include_router(
+    explanations.router,
+    prefix=f"{settings.API_V1_STR}/explanations",
+    tags=["Explanations"],
+)
 app.include_router(admin.router, prefix=f"{settings.API_V1_STR}/admin", tags=["admin"])
 
 
@@ -94,3 +101,5 @@ def root():
         "docs": "/docs",
         "version": settings.VERSION
     }
+
+app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])

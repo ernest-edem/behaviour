@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Any, Union, Optional, Dict
+from typing import Any, Union, Optional, Dict, TypedDict
 
 from jose import jwt, JWTError
 from passlib.context import CryptContext
@@ -8,9 +8,11 @@ from fastapi.security import OAuth2PasswordBearer
 
 from app.core.config import settings
 
-# -----------------------------
+
+# =========================================================
 # PASSWORD HASHING
-# -----------------------------
+# =========================================================
+
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -22,9 +24,20 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-# -----------------------------
-# JWT TOKEN CREATION
-# -----------------------------
+# =========================================================
+# TOKEN PAYLOAD TYPE
+# =========================================================
+
+class TokenPayload(TypedDict, total=False):
+    sub: str
+    role: str
+    exp: int  # JWT standard uses numeric timestamp
+
+
+# =========================================================
+# JWT CREATION
+# =========================================================
+
 def create_access_token(
     subject: Union[str, Any],
     expires_delta: Optional[timedelta] = None,
@@ -52,26 +65,24 @@ def create_access_token(
     )
 
 
-# -----------------------------
+# =========================================================
 # OAUTH2 SCHEME (SWAGGER FIX)
-# -----------------------------
+# =========================================================
+
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="/api/v1/auth/token"
 )
 
 
-# -----------------------------
-# CURRENT USER DEPENDENCY
-# -----------------------------
-def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
-    """
-    Decodes JWT token and returns payload.
-    Used in protected routes.
-    """
+# =========================================================
+# CURRENT USER (AUTH CORE)
+# =========================================================
+
+def get_current_user(token: str = Depends(oauth2_scheme)) -> TokenPayload:
 
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Invalid authentication credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
 
@@ -82,12 +93,67 @@ def get_current_user(token: str = Depends(oauth2_scheme)) -> Dict[str, Any]:
             algorithms=[settings.ALGORITHM],
         )
 
-        user_id: str = payload.get("sub")
+        user_id = payload.get("sub")
+        role = payload.get("role")
 
-        if user_id is None:
+        # -------------------------
+        # STRICT VALIDATION
+        # -------------------------
+        if not user_id:
             raise credentials_exception
+
+        if not role:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token missing role claim",
+            )
 
         return payload
 
     except JWTError:
         raise credentials_exception
+
+
+# =========================================================
+# USER HELPERS
+# =========================================================
+
+def get_current_user_id(
+    user: TokenPayload = Depends(get_current_user),
+) -> str:
+    return str(user["sub"])
+
+
+def get_current_user_role(
+    user: TokenPayload = Depends(get_current_user),
+) -> str:
+    return str(user["role"])
+
+
+# =========================================================
+# RBAC CORE
+# =========================================================
+
+def require_roles(allowed_roles: list[str]):
+    """
+    Production RBAC dependency.
+    """
+
+    def role_checker(
+        user: TokenPayload = Depends(get_current_user),
+    ):
+
+        role = user.get("role")
+
+        # -------------------------
+        # FORBIDDEN ACCESS
+        # -------------------------
+        if role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Access denied for role: {role}",
+            )
+
+        return user
+
+    return role_checker

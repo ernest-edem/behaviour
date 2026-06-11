@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import api from '../api/axios';
+import { authService } from '../services/authService';
+import { getApiErrorMessage } from '../utils/format';
 import { Activity, Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
 
 const Register: React.FC = () => {
@@ -24,20 +25,10 @@ const Register: React.FC = () => {
     setLoading(true);
 
     try {
-      const payload = {
-        email,
-        password,
-      };
-
-      console.log("Register payload:", payload);
-
-      const response = await api.post("/auth/register", payload);
-
-      console.log(response.data);
-
+      await authService.register({ email, password });
       navigate('/login', { state: { message: 'Registration successful! Please login.' } });
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Registration failed. Please try again.'));
     } finally {
       setLoading(false);
     }

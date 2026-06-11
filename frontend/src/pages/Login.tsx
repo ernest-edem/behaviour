@@ -1,15 +1,16 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, type UserRole } from '../auth/AuthContext';
-import api from '../api/axios';
+import { authService } from '../services/authService';
 import { Activity, Lock, Mail, AlertCircle, Loader2 } from 'lucide-react';
+import { getApiErrorMessage } from '../utils/format';
 
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -22,11 +23,11 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/login', { email, password });
-      login(response.data.access_token, response.data.role as UserRole);
+      const data = await authService.login({ email, password });
+      login(data.access_token, data.role as UserRole);
       navigate(from, { replace: true });
-    } catch (err: any) {
-      setError(err.response?.data?.message || 'Failed to login. Please check your credentials.');
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Failed to login. Please check your credentials.'));
     } finally {
       setLoading(false);
     }
@@ -42,7 +43,7 @@ const Login: React.FC = () => {
             Sign in to your BehaviorLens AI account
           </p>
         </div>
-        
+
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg flex items-center gap-2 text-sm">
@@ -50,7 +51,7 @@ const Login: React.FC = () => {
               <span>{error}</span>
             </div>
           )}
-          
+
           <div className="rounded-md shadow-sm space-y-4">
             <div className="relative">
               <label className="text-sm font-medium text-gray-700 mb-1 block">Email Address</label>
@@ -66,7 +67,7 @@ const Login: React.FC = () => {
                 onChange={(e) => setEmail(e.target.value)}
               />
             </div>
-            
+
             <div className="relative">
               <label className="text-sm font-medium text-gray-700 mb-1 block">Password</label>
               <div className="absolute inset-y-0 left-0 pl-3 pt-6 flex items-center pointer-events-none text-gray-400">
