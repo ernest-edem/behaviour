@@ -1,5 +1,8 @@
 import logging
 import sys
+import app.db.base
+
+from app.db.session import Base, engine
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +19,8 @@ from app.api.routes import (
 )
 from app.core.config import settings
 from app.core.exceptions import AppError
+
+
 
 # ==========================================================
 # LOGGING CONFIGURATION
@@ -39,6 +44,11 @@ app = FastAPI(
     version=settings.VERSION,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
 )
+
+# ==========================================================
+# DATABASE TABLES
+# ==========================================================
+Base.metadata.create_all(bind=engine)
 
 
 # ==========================================================
@@ -150,7 +160,7 @@ app.include_router(
 
 app.include_router(
     explanations.router,
-    prefix=settings.API_V1_STR,
+    prefix=settings.API_V1_STR, 
 )
 
 app.include_router(

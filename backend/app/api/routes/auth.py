@@ -64,6 +64,29 @@ def login(
     JSON login endpoint used by frontend clients.
     """
 
+    print("STEP 1")
+
+    user = auth_service.authenticate_user(
+        db=db,
+        user_in=user_in,
+    )
+
+    print("STEP 2")
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid email or password",
+        )
+
+    print("STEP 3")
+
+    token = auth_service.create_token_for_user(user)
+
+    print("STEP 4")
+
+    return token
+
     user = auth_service.authenticate_user(
         db=db,
         user_in=user_in,

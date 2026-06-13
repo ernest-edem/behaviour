@@ -1,5 +1,4 @@
-import { apiClient } from "./client";
-
+import api from "../api/axios";
 
 /**
  * -----------------------------
@@ -26,8 +25,18 @@ export interface AdminStats {
 }
 
 /**
+ * Default fallback stats (safe UI rendering)
+ */
+const defaultStats: AdminStats = {
+  total_users: 0,
+  total_admins: 0,
+  total_assessments: 0,
+  active_users: 0,
+};
+
+/**
  * -----------------------------
- * SERVICE LAYER (ADMIN API)
+ * ADMIN SERVICE
  * -----------------------------
  */
 
@@ -37,8 +46,12 @@ export const adminService = {
    */
   async getAllUsers(): Promise<AdminUser[]> {
     try {
-      const res = await apiClient.get("/admin/users");
-      return res.data ?? [];
+      const res = await api.get("/admin/users");
+
+      // defensive extraction (handles both {data: []} and direct [])
+      return Array.isArray(res.data)
+        ? res.data
+        : res.data?.data ?? [];
     } catch (error) {
       console.error("adminService.getAllUsers failed:", error);
       return [];
@@ -50,24 +63,18 @@ export const adminService = {
    */
   async getStats(): Promise<AdminStats> {
     try {
-      const res = await apiClient.get("/admin/stats");
-      return (
-        res.data ?? {
-          total_users: 0,
-          total_admins: 0,
-          total_assessments: 0,
-          active_users: 0,
-        }
-      );
+      const res = await api.get("/admin/stats");
+
+      // backend might return:
+      // 1. raw object
+      // 2. { data: object }
+      return {
+        ...defaultStats,
+        ...(res.data?.data ?? res.data),
+      };
     } catch (error) {
       console.error("adminService.getStats failed:", error);
-
-      return {
-        total_users: 0,
-        total_admins: 0,
-        total_assessments: 0,
-        active_users: 0,
-      };
+      return defaultStats;
     }
   },
 };

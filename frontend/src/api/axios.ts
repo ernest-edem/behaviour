@@ -1,10 +1,11 @@
 import axios from "axios";
 import type { InternalAxiosRequestConfig } from "axios";
 
-export const apiClient = axios.create({
-  baseURL: "http://localhost:8000/api/v1",
-});
-
+/**
+ * =========================
+ * SINGLE API CLIENT
+ * =========================
+ */
 const API_BASE_URL =
   import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
@@ -17,12 +18,17 @@ const api = axios.create({
   },
 });
 
+/**
+ * =========================
+ * AUTH INTERCEPTOR
+ * =========================
+ */
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem("token");
 
-    if (token) {
-      config.headers.set("Authorization", `Bearer ${token}`);
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
     return config;
@@ -30,17 +36,20 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+/**
+ * =========================
+ * GLOBAL ERROR HANDLING
+ * =========================
+ */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
 
-    // Token expired or invalid
     if (status === 401) {
       localStorage.removeItem("token");
       localStorage.removeItem("role");
 
-      // Prevent redirect loop
       if (
         window.location.pathname !== "/login" &&
         window.location.pathname !== "/register"

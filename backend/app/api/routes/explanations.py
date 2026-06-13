@@ -1,18 +1,17 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
-from app.core.rbac import Role, require_roles
+from app.db.session import get_db
 
 from app.models.user import User
 
-from app.schemas.explanation import (
-    PredictionExplanationResponse,
-)
+from app.schemas.explanation import PredictionExplanationResponse
 
-from app.services.explanation_service import (
-    explanation_service,
-)
+from app.services.explanation_service import explanation_service
+
+from app.core.iam.iam_engine import require_permission
+from app.core.iam.permissions import Permission
+
 
 router = APIRouter(
     prefix="/explanations",
@@ -32,11 +31,7 @@ def generate_explanation(
     prediction_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles(
-            Role.USER,
-            Role.CLINICIAN,
-            Role.ADMIN,
-        )
+        require_permission(Permission.PREDICTION_READ)
     ),
 ):
     """
@@ -51,8 +46,7 @@ def generate_explanation(
     ADMIN
         Global access.
 
-    Ownership and visibility rules are enforced
-    inside ExplanationService.
+    Ownership rules remain in service layer.
     """
 
     return explanation_service.generate_explanations_for_user(
@@ -73,27 +67,14 @@ def get_explanation(
     prediction_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles(
-            Role.USER,
-            Role.CLINICIAN,
-            Role.ADMIN,
-        )
+        require_permission(Permission.PREDICTION_READ)
     ),
 ):
     """
     Retrieve explanations.
 
-    USER
-        Own predictions only.
-
-    CLINICIAN
-        Read access to patient predictions.
-
-    ADMIN
-        Full system access.
-
-    Ownership enforcement is performed
-    by ExplanationService.
+    Authorization is handled by IAM.
+    Ownership is handled in service layer.
     """
 
     return explanation_service.get_explanations_for_user(

@@ -3,8 +3,6 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
-from app.core.rbac import Role, require_roles
-
 from app.models.user import User
 
 from app.schemas.disease_prediction import (
@@ -14,6 +12,10 @@ from app.schemas.disease_prediction import (
 from app.services.disease_prediction_service import (
     disease_prediction_service,
 )
+
+from app.core.iam.iam_engine import require_permission
+from app.core.iam.permissions import Permission
+
 
 router = APIRouter(
     prefix="/disease-predictions",
@@ -33,24 +35,15 @@ def generate_predictions(
     assessment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles(
-            Role.USER,
-            Role.CLINICIAN,
-            Role.ADMIN,
-        )
+        require_permission(Permission.DISEASE_WRITE)
     ),
 ):
     """
     Generate disease predictions.
 
-    USER
-        Can generate predictions for own assessments.
-
-    CLINICIAN
-        Can generate predictions for any patient assessment.
-
-    ADMIN
-        Full access.
+    USER → allowed via IAM policies
+    CLINICIAN → allowed via IAM policies
+    ADMIN → full access via IAM policies
     """
 
     return disease_prediction_service.generate_predictions_for_user(
@@ -71,24 +64,11 @@ def get_predictions(
     assessment_id: int,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles(
-            Role.USER,
-            Role.CLINICIAN,
-            Role.ADMIN,
-        )
+        require_permission(Permission.DISEASE_READ)
     ),
 ):
     """
-    Retrieve disease predictions.
-
-    USER
-        Own predictions only.
-
-    CLINICIAN
-        Global read access.
-
-    ADMIN
-        Full access.
+    Retrieve disease predictions via IAM enforcement.
     """
 
     return disease_prediction_service.get_predictions(

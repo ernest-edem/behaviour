@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 
-from app.core.rbac import Role, require_roles
+from app.core.iam.iam_engine import require_permission
+from app.core.iam.permissions import Permission
 
 from app.models.user import User
 
@@ -12,9 +13,8 @@ from app.schemas.prediction import (
     AssessmentResult,
 )
 
-from app.services.prediction_service import (
-    prediction_service,
-)
+from app.services.prediction_service import prediction_service
+
 
 router = APIRouter(
     prefix="/predictions",
@@ -23,7 +23,7 @@ router = APIRouter(
 
 
 # ==========================================================
-# CREATE PREDICTION
+# CREATE PREDICTION (IAM CONTROLLED)
 # ==========================================================
 @router.post(
     "/predict",
@@ -34,25 +34,19 @@ def predict(
     data: PredictionInput,
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles(
-            Role.USER,
-        )
+        require_permission(Permission.PREDICTION_WRITE)
     ),
 ):
     """
-    Generate a prediction for the authenticated user.
+    IAM-controlled prediction endpoint.
 
-    USER
-        Can create predictions for themselves.
+    Access:
+        ✔ USER (allowed via policy)
+        ✔ CLINICIAN (if policy allows)
+        ✔ ADMIN (always via full permission set)
 
-    CLINICIAN
-        Not allowed.
-
-    ADMIN
-        Not allowed.
-
-    Ownership is automatically assigned to the
-    authenticated user.
+    Ownership:
+        Automatically assigned to authenticated user.
     """
 
     return prediction_service.process_assessment(

@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_db
-from app.core.rbac import require_roles
+from app.db.session import get_db
+from app.core.iam.iam_engine import require_permission
+from app.core.iam.permissions import Permission
 
-from app.models.user import User, UserRole
+from app.models.user import User
 
 from app.schemas.assessment import (
     AssessmentCreate,
@@ -13,11 +14,12 @@ from app.schemas.assessment import (
 
 from app.services.assessment import assessment_service
 
+
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
 
 # =========================================================
-# CREATE ASSESSMENT (USER ONLY)
+# CREATE ASSESSMENT
 # =========================================================
 @router.post(
     "",
@@ -27,11 +29,8 @@ router = APIRouter(prefix="/assessments", tags=["Assessments"])
 def create_assessment(
     assessment_in: AssessmentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.USER])),
+    current_user: User = Depends(require_permission(Permission.ASSESSMENT_WRITE)),
 ):
-    """
-    Create a new assessment for authenticated user.
-    """
     return assessment_service.create_assessment(
         db=db,
         assessment_in=assessment_in,
@@ -40,7 +39,7 @@ def create_assessment(
 
 
 # =========================================================
-# LIST OWN ASSESSMENTS (USER ONLY)
+# LIST OWN ASSESSMENTS
 # =========================================================
 @router.get(
     "",
@@ -48,11 +47,8 @@ def create_assessment(
 )
 def list_assessments(
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.USER])),
+    current_user: User = Depends(require_permission(Permission.ASSESSMENT_READ)),
 ):
-    """
-    Return assessments belonging to current user only.
-    """
     return assessment_service.list_user_assessments(
         db=db,
         user=current_user,
@@ -60,7 +56,7 @@ def list_assessments(
 
 
 # =========================================================
-# GET SINGLE ASSESSMENT (USER ONLY - OWNERSHIP ENFORCED)
+# GET SINGLE ASSESSMENT
 # =========================================================
 @router.get(
     "/{assessment_id}",
@@ -69,11 +65,8 @@ def list_assessments(
 def get_assessment(
     assessment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.USER])),
+    current_user: User = Depends(require_permission(Permission.ASSESSMENT_READ)),
 ):
-    """
-    Retrieve a single assessment owned by current user.
-    """
     return assessment_service.get_user_assessment(
         db=db,
         assessment_id=assessment_id,
@@ -82,40 +75,22 @@ def get_assessment(
 
 
 # =========================================================
-# CLINICIAN OVERRIDE (READ-ONLY GLOBAL ACCESS)
+# CLINICIAN / ADMIN GLOBAL ACCESS
 # =========================================================
 @router.get(
-    "/clinician/all",
+    "/all",
     response_model=list[AssessmentResponse],
 )
-def clinician_list_assessments(
+def list_all_assessments(
     db: Session = Depends(get_db),
     current_user: User = Depends(
-        require_roles([UserRole.CLINICIAN, UserRole.ADMIN])
+        require_permission(Permission.ASSESSMENT_READ)
     ),
 ):
     """
-    Clinician/Admin read-only access to all assessments.
-    """
-    return assessment_service.list_all_assessments(
-        db=db,
-        user=current_user,
-    )
-
-
-# =========================================================
-# ADMIN OVERRIDE (SYSTEM AUDIT VIEW)
-# =========================================================
-@router.get(
-    "/admin/all",
-    response_model=list[AssessmentResponse],
-)
-def admin_list_assessments(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles([UserRole.ADMIN])),
-):
-    """
-    Admin-only system-wide assessment access.
+    NOTE:
+    In IAM model, clinicians/admins are granted ASSESSMENT_READ_ALL
+    via policy store if needed.
     """
     return assessment_service.list_all_assessments(
         db=db,

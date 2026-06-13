@@ -16,66 +16,25 @@ logger = logging.getLogger(__name__)
 
 
 class AuthService:
-    """
-    Authentication and user management service.
 
-    Responsibilities:
-    - User registration
-    - User authentication
-    - JWT generation
-
-    Bootstrap policy:
-    - First registered user becomes ADMIN.
-    - All subsequent users become USER.
-    """
-
-    # =====================================================
-    # CREATE USER
-    # =====================================================
     @staticmethod
-    def create_user(
-        db: Session,
-        user_in: UserCreate,
-    ) -> User:
-        """
-        Create a new user account.
-
-        Bootstrap behavior:
-            - First user -> ADMIN
-            - Subsequent users -> USER
-        """
+    def create_user(db: Session, user_in: UserCreate) -> User:
 
         normalized_email = user_in.email.lower().strip()
 
-        existing_user = (
-            db.query(User)
-            .filter(User.email == normalized_email)
-            .first()
-        )
+        existing_user = db.query(User).filter(User.email == normalized_email).first()
 
         if existing_user:
-            raise AuthError(
-                message="User with this email already exists"
-            )
+            raise AuthError(message="User with this email already exists")
 
-        admin_exists = (
-            db.query(User)
-            .filter(User.role == UserRole.ADMIN)
-            .first()
-        )
+        admin_exists = db.query(User).filter(User.role == UserRole.ADMIN).first()
 
-        assigned_role = (
-            UserRole.ADMIN
-            if admin_exists is None
-            else UserRole.USER
-        )
+        assigned_role = UserRole.ADMIN if admin_exists is None else UserRole.USER
 
         user = User(
             email=normalized_email,
             name=normalized_email.split("@")[0],
-            hashed_password=get_password_hash(
-                user_in.password
-            ),
+            hashed_password=get_password_hash(user_in.password),
             role=assigned_role,
             is_active=True,
         )
@@ -86,111 +45,53 @@ class AuthService:
 
         return user
 
-    # =====================================================
-    # AUTHENTICATE USER
-    # =====================================================
     @staticmethod
-    def authenticate_user(
-        db: Session,
-        user_in: UserLogin,
-    ) -> User:
-        """
-        Authenticate a user using email and password.
-        """
+    def authenticate_user(db: Session, user_in: UserLogin) -> User:
 
         normalized_email = user_in.email.lower().strip()
 
-        logger.info(
-            "Login attempt for email=%s",
-            normalized_email,
-        )
-
-        user = (
-            db.query(User)
-            .filter(User.email == normalized_email)
-            .first()
-        )
-
-        logger.info(
-            "User found: %s",
-            user is not None,
-        )
+        user = db.query(User).filter(User.email == normalized_email).first()
 
         if user is None:
-            raise AuthError(
-                message="Incorrect email or password"
-            )
+            raise AuthError(message="Incorrect email or password")
 
-        password_match = verify_password(
-            user_in.password,
-            user.hashed_password,
-        )
-
-        logger.info(
-            "Password match: %s",
-            password_match,
-        )
-
-        if not password_match:
-            raise AuthError(
-                message="Incorrect email or password"
-            )
+        if not verify_password(user_in.password, user.hashed_password):
+            raise AuthError(message="Incorrect email or password")
 
         if not user.is_active:
-            raise AuthError(
-                message="Inactive user"
-            )
-
-        logger.info(
-            "Login successful for user_id=%s",
-            user.id,
-        )
+            raise AuthError(message="Inactive user")
 
         return user
 
-    # =====================================================
-    # TOKEN PAYLOAD
-    # =====================================================
     @staticmethod
-    def _build_token_payload(
-        user: User,
-    ) -> dict[str, Any]:
-        """
-        Build JWT custom claims.
-        """
-
+    def _build_token_payload(user: User) -> dict[str, Any]:
         return {
             "role": user.role.value,
             "email": user.email,
         }
 
-    # =====================================================
-    # CREATE ACCESS TOKEN
-    # =====================================================
     @staticmethod
-    def create_token_for_user(
-        user: User,
-    ) -> dict[str, str]:
-        """
-        Create JWT access token.
-        """
+    def create_token_for_user(user: User) -> dict[str, str]:
 
         access_token = create_access_token(
             subject=str(user.id),
-            additional_claims=AuthService._build_token_payload(
-                user
-            ),
+            additional_claims=AuthService._build_token_payload(user),
         )
 
         return {
             "access_token": access_token,
             "token_type": "bearer",
             "role": user.role.value,
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "role": user.role.value,
+                "name": user.name,
+            },
         }
 
 
 # =========================================================
-# SINGLETON INSTANCE
+# 🔥 CRITICAL FIX: EXPOSE SINGLETON
 # =========================================================
-
 auth_service = AuthService()

@@ -1,12 +1,15 @@
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "../auth/AuthContext";
 
 export default function Topbar() {
-  const { user, logout } = useAuth();
+  const { role, logout } = useAuth();
 
   return (
     <header className="h-14 border-b flex items-center justify-between px-4 bg-white">
       <div className="text-sm text-gray-600">
-        Welcome, <span className="font-medium">{user?.name}</span>
+        Logged in as{" "}
+        <span className="font-medium capitalize">
+          {role}
+        </span>
       </div>
 
       <button

@@ -31,7 +31,7 @@ import { DEFAULT_ROUTES } from "./utils/rbacRoutes";
 import type { UserRole } from "./utils/rbacRoutes";
 
 /**
- * ROLE REDIRECT (SAFE)
+ * ROLE REDIRECT
  */
 const RoleRedirect = () => {
   const { role, loading, isAuthenticated } = useAuth();
@@ -48,9 +48,7 @@ const RoleRedirect = () => {
     return <Navigate to="/login" replace />;
   }
 
-  return (
-    <Navigate to={DEFAULT_ROUTES[role as UserRole]} replace />
-  );
+  return <Navigate to={DEFAULT_ROUTES[role as UserRole]} replace />;
 };
 
 /**
@@ -63,43 +61,53 @@ function AppRoutes() {
       {/* PUBLIC */}
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
+      <Route path="/unauthorized" element={<Unauthorized />} />
 
       {/* ROOT */}
       <Route path="/" element={<RoleRedirect />} />
 
-      {/* UNAUTHORIZED */}
-      <Route path="/unauthorized" element={<Unauthorized />} />
-
       {/* =========================
-          USER ROUTES
+          USER (LAYOUT ROUTE)
       ========================= */}
-      <Route element={<ProtectedRoute allowedRoles={["user"]} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/dashboard" element={<DashboardHome />} />
-          <Route path="/assessments" element={<AssessmentsPage />} />
-          <Route path="/predictions" element={<PredictionsPage />} />
-          <Route path="/history" element={<HistoryPage />} />
-          <Route path="/history/:assessmentId" element={<HistoryDetailPage />} />
-        </Route>
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={["user"]}>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/dashboard" element={<DashboardHome />} />
+        <Route path="/assessments" element={<AssessmentsPage />} />
+        <Route path="/predictions" element={<PredictionsPage />} />
+        <Route path="/history" element={<HistoryPage />} />
+        <Route path="/history/:assessmentId" element={<HistoryDetailPage />} />
       </Route>
 
       {/* =========================
-          CLINICIAN ROUTES
+          CLINICIAN
       ========================= */}
-      <Route element={<ProtectedRoute allowedRoles={["clinician"]} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/clinician/dashboard" element={<ClinicianDashboard />} />
-          <Route path="/explanations" element={<ExplanationsPage />} />
-        </Route>
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={["clinician"]}>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/clinician/dashboard" element={<ClinicianDashboard />} />
+        <Route path="/explanations" element={<ExplanationsPage />} />
       </Route>
 
       {/* =========================
-          ADMIN ROUTES
+          ADMIN
       ========================= */}
-      <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
-        <Route element={<DashboardLayout />}>
-          <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        </Route>
+      <Route
+        element={
+          <ProtectedRoute allowedRoles={["admin"]}>
+            <DashboardLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
       </Route>
 
       {/* FALLBACK */}

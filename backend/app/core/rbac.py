@@ -1,10 +1,6 @@
 from enum import Enum
-from typing import Iterable
+from typing import Any, Iterable, Set, List
 
-from fastapi import Depends
-
-from app.api.deps import get_current_user
-from app.core.exceptions import ForbiddenError
 from app.models.user import User, UserRole
 
 
@@ -14,54 +10,39 @@ class Role(str, Enum):
     ADMIN = "admin"
 
 
-def require_roles(*allowed_roles):
-    """
-    Production-grade RBAC dependency.
+ROLE_HIERARCHY: dict[str, int] = {
+    "user": 1,
+    "clinician": 2,
+    "admin": 3,
+}
 
-    Supports all of the following:
 
-        require_roles(Role.USER)
+def _to_role_str(role: Any) -> str:
+    if role is None:
+        raise ValueError("Role cannot be None")
 
-        require_roles(
-            Role.USER,
-            Role.ADMIN,
-        )
+    if isinstance(role, UserRole):
+        return role.value
 
-        require_roles(
-            [Role.USER, Role.ADMIN]
-        )
+    if isinstance(role, Role):
+        return role.value
 
-        require_roles(
-            [UserRole.USER, UserRole.ADMIN]
-        )
-    """
+    if isinstance(role, str):
+        return role.lower()
 
-    # Flatten lists/tuples/sets
-    flattened_roles = []
+    raise ValueError(f"Invalid role type: {type(role)}")
 
-    for role in allowed_roles:
-        if isinstance(role, (list, tuple, set)):
-            flattened_roles.extend(role)
-        else:
-            flattened_roles.append(role)
 
-    allowed_user_roles = {
-        UserRole(role.value)
-        if isinstance(role, Role)
-        else UserRole(role)
-        if isinstance(role, str)
-        else role
-        for role in flattened_roles
-    }
+def has_role_or_above(user_role: str, required_role: str) -> bool:
+    return ROLE_HIERARCHY.get(user_role, 0) >= ROLE_HIERARCHY.get(required_role, 0)
 
-    def checker(
-        current_user: User = Depends(get_current_user),
-    ) -> User:
-        if current_user.role not in allowed_user_roles:
-            raise ForbiddenError(
-                message="You do not have permission to access this resource"
-            )
 
-        return current_user
+# =========================================================
+# HELPER ONLY (NO AUTHORIZATION)
+# =========================================================
+def normalize_role(role: Any) -> str:
+    return _to_role_str(role)
 
-    return checker
+
+def role_level(role: Any) -> int:
+    return ROLE_HIERARCHY.get(_to_role_str(role), 0)

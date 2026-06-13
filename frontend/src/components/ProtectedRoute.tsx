@@ -1,31 +1,50 @@
-import { Navigate, Outlet } from "react-router-dom";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 
 export type Role = "user" | "clinician" | "admin";
 
 interface Props {
   allowedRoles: Role[];
+  children?: React.ReactNode;
 }
 
-export default function ProtectedRoute({ allowedRoles }: Props) {
-  const { token, role, loading } = useAuth();
+function normalizeRole(role: string | null | undefined): Role | null {
+  if (!role) return null;
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        Loading...
-      </div>
-    );
+  const r = role.toLowerCase().trim();
+
+  if (r === "admin" || r === "role_admin") return "admin";
+  if (r === "clinician" || r === "role_clinician") return "clinician";
+  if (r === "user" || r === "role_user") return "user";
+
+  return null;
+}
+
+export default function ProtectedRoute({
+  allowedRoles,
+  children,
+}: Props) {
+  const { token, role, loading } = useAuth();
+  const location = useLocation();
+
+  if (loading) return null;
+
+  // not logged in
+  if (!token) {
+    return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  if (!token || !role) {
+  const normalizedRole = normalizeRole(role);
+
+  // invalid role → treat as auth failure
+  if (!normalizedRole) {
     return <Navigate to="/login" replace />;
   }
 
-  // ❌ STRICT BLOCK (no fallback to another dashboard)
-  if (!allowedRoles.includes(role)) {
+  // role not allowed
+  if (!allowedRoles.includes(normalizedRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
-  return <Outlet />;
+  return children ? <>{children}</> : <Outlet />;
 }
